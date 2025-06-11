@@ -138,7 +138,7 @@ npm test
 
 ### 开发环境部署
 
-1. 确保Node.js版本 >= 14.0.0
+1. 确保Node.js版本 >= 16.0.0
 2. 安装依赖: `npm install`
 3. 同时启动两个服务: `npm run dev` 和 `npm run server`
 
