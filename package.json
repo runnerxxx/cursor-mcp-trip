@@ -1,0 +1,17 @@
+{
+  "name": "usr-encrypt-tool",
+  "version": "1.0.0",
+  "description": "USR信息加密工具 - 包含代理服务器和前端页面",
+  "main": "proxy-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node proxy-server.js",
+    "dev": "node proxy-server.js"
+  },
+  "keywords": ["usr", "encrypt", "proxy", "cors"],
+  "author": "xulijing",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

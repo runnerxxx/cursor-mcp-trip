@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USR信息加密工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        .title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .status-notice {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #0c5460;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .select-container {
+            position: relative;
+        }
+        
+        .select-input {
+            width: 100%;
+            padding: 12px 40px 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+        
+        .select-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .select-arrow {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: #666;
+            transition: transform 0.3s ease;
+        }
+        
+        .select-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .select-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .select-option:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .select-option:last-child {
+            border-bottom: none;
+        }
+        
+        .select-option.selected {
+            background-color: #667eea;
+            color: white;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102,126,234,0.4);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .result-title {
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .result-content {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            color: #e74c3c;
+            background: #fdf2f2;
+            border-left-color: #e74c3c;
+        }
+        
+        .success {
+            color: #27ae60;
+            background: #f2fdf2;
+            border-left-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">USR信息加密工具</h1>
+        
+        <div class="status-notice">
+            <strong>🌐 云端部署版本</strong><br>
+            • 此工具已部署到云端，无需本地安装任何环境<br>
+            • 直接填写信息并点击加密按钮即可使用<br>
+            • 支持所有产品的AppID选择和USR信息加密
+        </div>
+        
+        <form id="encryptForm">
+            <div class="form-group">
+                <label class="form-label" for="usrInput">原始USR信息</label>
+                <input type="text" id="usrInput" class="form-input" placeholder="请输入原始USR信息，例如：tj1279771586" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="appIdSelect">AppID</label>
+                <div class="select-container">
+                    <input type="text" id="appIdSelect" class="select-input" placeholder="请选择或输入AppID" autocomplete="off" required>
+                    <span class="select-arrow">▼</span>
+                    <div class="select-dropdown" id="selectDropdown"></div>
+                </div>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">获取加密USR信息</button>
+        </form>
+        
+        <div class="result-section" id="resultSection">
+            <h3 class="result-title">加密结果</h3>
+            <div class="result-content" id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // AppID选项数据
+        const appIdOptions = [
+            {"label": "得间小说安卓 (zy4248ba)", "value": "zy4248ba"},
+            {"label": "得间小说 iOS (zy4248ba)", "value": "zy4248ba"},
+            {"label": "得间小说安卓极速版 (zy8f2e24)", "value": "zy8f2e24"},
+            {"label": "得间小说 iOS 极速版 (zy8f2e24)", "value": "zy8f2e24"},
+            {"label": "追读 iOS (zybc0e74)", "value": "zybc0e74"},
+            {"label": "七读小说 (zy819b7a)", "value": "zy819b7a"},
+            {"label": "得间畅听 (zy9b17a7)", "value": "zy9b17a7"},
+            {"label": "琅阅小说 (zy21c192)", "value": "zy21c192"},
+            {"label": "得间大字版 (zy78e04c)", "value": "zy78e04c"},
+            {"label": "阅瓣小说 (zy7595fe)", "value": "zy7595fe"},
+            {"label": "贤读小说 (zyf36a0f)", "value": "zyf36a0f"},
+            {"label": "追读小说 (zyd0d2ca)", "value": "zyd0d2ca"},
+            {"label": "袋鼠点点小说 (zybd351b)", "value": "zybd351b"},
+            {"label": "盛读小说 (zy0903f1)", "value": "zy0903f1"},
+            {"label": "速读小说 (zyb03dd4)", "value": "zyb03dd4"},
+            {"label": "浩看小说 (zy613a68)", "value": "zy613a68"},
+            {"label": "秘读小说 (zy4cb605)", "value": "zy4cb605"},
+            {"label": "浩阅小说 (zy8eef2a)", "value": "zy8eef2a"},
+            {"label": "袋鼠点点短视频 (zyf4648c)", "value": "zyf4648c"},
+            {"label": "枫以短视频 (zy3d1ef1)", "value": "zy3d1ef1"},
+            {"label": "薏米短剧 (zy9351ae)", "value": "zy9351ae"},
+            {"label": "速看短剧 (zya8dad8)", "value": "zya8dad8"},
+            {"label": "伊看短剧 (zy6ee66f)", "value": "zy6ee66f"},
+            {"label": "卡看 (zya3c0e0)", "value": "zya3c0e0"},
+            {"label": "北京主体伊看 (zy8b0c8f)", "value": "zy8b0c8f"},
+            {"label": "得间努比亚小说 (zye4a38c)", "value": "zye4a38c"},
+            {"label": "得间鸿蒙 (zy4248ba)", "value": "zy4248ba"},
+            {"label": "鸿蒙-七读小说 (zy819b7a)", "value": "zy819b7a"},
+            {"label": "鸿蒙-浩看小说 (zy613a68)", "value": "zy613a68"},
+            {"label": "鸿蒙-得间极速版 (zy8f2e24)", "value": "zy8f2e24"},
+            {"label": "鸿蒙-阅瓣小说 (zy7595fe)", "value": "zy7595fe"},
+            {"label": "鸿蒙-追读小说 (zyd0d2ca)", "value": "zyd0d2ca"},
+            {"label": "新速看短剧（北京伊看） (zy8b0c8f)", "value": "zy8b0c8f"}
+        ];
+
+        // DOM元素
+        const selectInput = document.getElementById('appIdSelect');
+        const selectDropdown = document.getElementById('selectDropdown');
+        const selectArrow = document.querySelector('.select-arrow');
+        const form = document.getElementById('encryptForm');
+        const resultSection = document.getElementById('resultSection');
+        const resultContent = document.getElementById('resultContent');
+        const submitBtn = document.getElementById('submitBtn');
+
+        let isDropdownOpen = false;
+        let filteredOptions = [...appIdOptions];
+
+        // 渲染选项
+        function renderOptions(options) {
+            selectDropdown.innerHTML = '';
+            options.forEach(option => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'select-option';
+                optionElement.textContent = option.label;
+                optionElement.dataset.value = option.value;
+                optionElement.addEventListener('click', () => selectOption(option));
+                selectDropdown.appendChild(optionElement);
+            });
+        }
+
+        // 选择选项
+        function selectOption(option) {
+            selectInput.value = option.value;
+            selectInput.dataset.label = option.label;
+            closeDropdown();
+        }
+
+        // 打开下拉框
+        function openDropdown() {
+            isDropdownOpen = true;
+            selectDropdown.style.display = 'block';
+            selectArrow.style.transform = 'translateY(-50%) rotate(180deg)';
+            renderOptions(filteredOptions);
+        }
+
+        // 关闭下拉框
+        function closeDropdown() {
+            isDropdownOpen = false;
+            selectDropdown.style.display = 'none';
+            selectArrow.style.transform = 'translateY(-50%) rotate(0deg)';
+        }
+
+        // 过滤选项
+        function filterOptions(searchText) {
+            filteredOptions = appIdOptions.filter(option => 
+                option.label.toLowerCase().includes(searchText.toLowerCase()) ||
+                option.value.toLowerCase().includes(searchText.toLowerCase())
+            );
+            if (isDropdownOpen) {
+                renderOptions(filteredOptions);
+            }
+        }
+
+        // 事件监听
+        selectInput.addEventListener('click', () => {
+            if (isDropdownOpen) {
+                closeDropdown();
+            } else {
+                openDropdown();
+            }
+        });
+
+        selectInput.addEventListener('input', (e) => {
+            const value = e.target.value;
+            filterOptions(value);
+            if (!isDropdownOpen && value) {
+                openDropdown();
+            }
+        });
+
+        selectInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                closeDropdown();
+            } else if (e.key === 'Escape') {
+                closeDropdown();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.select-container')) {
+                closeDropdown();
+            }
+        });
+
+        // 表单提交
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const usr = document.getElementById('usrInput').value.trim();
+            const p29 = selectInput.value.trim();
+            
+            if (!usr || !p29) {
+                showResult('请填写完整的USR信息和AppID', 'error');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span>加密中...';
+            
+            try {
+                // 使用相对路径调用同域名下的代理接口
+                const proxyUrl = `/proxy?usr=${encodeURIComponent(usr)}&p29=${encodeURIComponent(p29)}`;
+                const response = await fetch(proxyUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.text();
+                    showResult(`✅ 加密成功！\n\n原始USR: ${usr}\nAppID: ${p29}\n加密结果: ${result}`, 'success');
+                } else {
+                    throw new Error(`服务器响应错误: HTTP ${response.status}`);
+                }
+            } catch (error) {
+                console.error('加密请求失败:', error);
+                showResult(`❌ 加密失败: ${error.message}\n\n请检查网络连接或联系管理员`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '获取加密USR信息';
+            }
+        });
+
+        // 显示结果
+        function showResult(message, type = 'success') {
+            resultContent.textContent = message;
+            resultContent.className = `result-content ${type}`;
+            resultSection.style.display = 'block';
+            resultSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 初始化
+        renderOptions(appIdOptions);
+    </script>
+</body>
+</html>
