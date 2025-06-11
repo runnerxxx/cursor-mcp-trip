@@ -1,26 +1,63 @@
 {
   "name": "usr-encrypt-tool",
   "version": "1.0.0",
-  "description": "USR信息加密工具 - 包含代理服务器和前端页面",
-  "main": "proxy-server.js",
+  "description": "基于Vue3 + TypeScript + Vite构建",
+  "main": "src/main.ts",
   "type": "module",
   "scripts": {
-    "start": "node proxy-server.js",
-    "dev": "node proxy-server.js",
-    "build": "echo 'No build step required - static files ready for deployment'",
-    "test": "echo 'No tests specified'",
-    "lint": "echo 'No linting configured'",
-    "deploy": "npm start"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "vite preview",
+    "start": "npm run dev",
+    "server": "node proxy-server.js",
+    "build:prod": "vite build --mode production",
+    "type-check": "vue-tsc --noEmit",
+    "clean": "rm -rf dist node_modules/.vite",
+    "test": "echo 'No tests specified - 暂未配置测试'",
+    "lint": "echo 'No linting configured - 暂未配置代码检查'"
   },
-  "keywords": ["usr", "encrypt", "proxy", "cors", "nodejs", "html"],
-  "author": "xulijing",
+  "dependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.8.3",
+    "vite": "^5.0.0",
+    "vue-tsc": "^2.2.10"
+  },
+  "keywords": [
+    "vue3",
+    "typescript",
+    "vite"
+  ],
+  "author": {
+    "name": "xukeke",
+    "email": "1396543472@qq.com"
+  },
   "license": "MIT",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
   },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/runnerxxx/cursor-mcp-trip.git"
   },
-  "homepage": "https://github.com/runnerxxx/cursor-mcp-trip#readme"
+  "homepage": "https://github.com/runnerxxx/cursor-mcp-trip#readme",
+  "bugs": {
+    "url": "https://github.com/runnerxxx/cursor-mcp-trip/issues"
+  },
+  "private": false,
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/runnerxxx"
+  }
 }

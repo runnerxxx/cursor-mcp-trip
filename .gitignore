@@ -63,17 +63,3 @@ tmp/
 # Build outputs
 dist/
 build/
-
-# Vue.js specific (keeping for reference)
-src/assets/
-src/router/
-src/types/
-src/views/
-public/
-index.html
-vite.config.ts
-tsconfig.*.json
-pnpm-lock.yaml
-deploy_complete.html
-edgeOnePages.html
-temp_deploy.html
