@@ -1,0 +1,483 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# API设计与实现规范
+
+## 整体架构
+
+项目API层采用分层架构，结合OOP与FP范式的优势，包含以下层次：
+
+1. **基础请求层**：封装底层HTTP请求
+2. **API服务层**：按业务领域组织的API方法
+3. **数据转换层**：处理API响应数据的转换
+4. **错误处理层**：统一的错误处理策略
+
+## 1. 请求封装最佳实践
+
+### 1.1 基础请求类
+
+使用类封装基础HTTP请求逻辑，确保单一职责和可测试性。
+
+```javascript
+// src/api/http.js
+import axios from 'axios';
+import { ENV_CONFIG } from '@/base/config';
+
+/**
+ * HTTP请求基础类
+ * 负责封装axios请求，处理公共配置和拦截器
+ */
+export class HttpClient {
+  constructor(baseConfig = {}) {
+    this.client = axios.create({
+      baseURL: ENV_CONFIG.API_BASE_URL,
+      timeout: 10000,
+      ...baseConfig
+    });
+    
+    this.initInterceptors();
+  }
+  
+  /**
+   * 初始化请求/响应拦截器
+   * @private
+   */
+  initInterceptors() {
+    // 请求拦截器
+    this.client.interceptors.request.use(
+      config => {
+        // 添加通用请求头
+        config.headers['X-Client-Version'] = ENV_CONFIG.APP_VERSION;
+        
+        // 添加认证信息
+        const token = localStorage.getItem('token');
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        return config;
+      },
+      error => Promise.reject(error)
+    );
+    
+    // 响应拦截器
+    this.client.interceptors.response.use(
+      response => response.data,
+      this.handleError
+    );
+  }
+  
+  /**
+   * 错误处理函数
+   * @param {Error} error - 错误对象
+   * @private
+   */
+  handleError(error) {
+    // 处理网络错误
+    if (!error.response) {
+      return Promise.reject({
+        code: 'NETWORK_ERROR',
+        message: '网络连接失败，请检查网络设置'
+      });
+    }
+    
+    // 处理HTTP错误
+    const { status, data } = error.response;
+    
+    // 处理认证错误
+    if (status === 401) {
+      // 清除登录状态，跳转登录页
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    
+    return Promise.reject({
+      code: data.code || `HTTP_ERROR_${status}`,
+      message: data.message || '服务器错误，请稍后再试',
+      data: data.data
+    });
+  }
+  
+  /**
+   * 发送GET请求
+   * @param {string} url - 请求URL
+   * @param {Object} params - 请求参数
+   * @param {Object} config - 请求配置
+   * @returns {Promise<any>} 响应数据
+   */
+  get(url, params = {}, config = {}) {
+    return this.client.get(url, { ...config, params });
+  }
+  
+  /**
+   * 发送POST请求
+   * @param {string} url - 请求URL
+   * @param {Object} data - 请求数据
+   * @param {Object} config - 请求配置
+   * @returns {Promise<any>} 响应数据
+   */
+  post(url, data = {}, config = {}) {
+    return this.client.post(url, data, config);
+  }
+  
+  // 其他HTTP方法...
+}
+
+// 导出单例实例
+export const httpClient = new HttpClient();
+```
+
+### 1.2 函数式API请求增强
+
+使用高阶函数对API请求进行功能增强，实现重试、缓存、节流等特性。
+
+```javascript
+// src/api/enhancers.js
+import { debounce, throttle } from 'lodash-es';
+
+/**
+ * 请求重试增强器
+ * @param {Function} requestFn - 原始请求函数
+ * @param {number} maxRetries - 最大重试次数
+ * @param {number} retryDelay - 重试延迟(ms)
+ * @returns {Function} 增强后的请求函数
+ */
+export const withRetry = (requestFn, maxRetries = 3, retryDelay = 1000) => {
+  return async (...args) => {
+    let lastError;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await requestFn(...args);
+      } catch (error) {
+        lastError = error;
+        
+        // 如果不是网络错误，不再重试
+        if (error.code !== 'NETWORK_ERROR') {
+          throw error;
+        }
+        
+        // 最后一次尝试失败，直接抛出错误
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // 等待后重试
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+    
+    throw lastError;
+  };
+};
+
+/**
+ * 请求缓存增强器
+ * @param {Function} requestFn - 原始请求函数
+ * @param {number} ttl - 缓存有效期(ms)
+ * @returns {Function} 增强后的请求函数
+ */
+export const withCache = (requestFn, ttl = 60000) => {
+  const cache = new Map();
+  
+  return async (...args) => {
+    // 生成缓存键
+    const cacheKey = JSON.stringify(args);
+    
+    // 检查缓存是否有效
+    const cachedItem = cache.get(cacheKey);
+    if (cachedItem && Date.now() < cachedItem.expiry) {
+      return cachedItem.data;
+    }
+    
+    // 执行请求
+    const data = await requestFn(...args);
+    
+    // 更新缓存
+    cache.set(cacheKey, {
+      data,
+      expiry: Date.now() + ttl
+    });
+    
+    return data;
+  };
+};
+
+/**
+ * 请求节流增强器
+ * @param {Function} requestFn - 原始请求函数
+ * @param {number} wait - 节流等待时间(ms)
+ * @returns {Function} 增强后的请求函数
+ */
+export const withThrottle = (requestFn, wait = 300) => {
+  return throttle(requestFn, wait, { leading: true, trailing: true });
+};
+```
+
+## 2. API服务层设计
+
+### 2.1 领域服务类
+
+按业务领域组织API服务类，每个类负责一个业务领域的API调用。
+
+```javascript
+// src/api/services/user-service.js
+import { httpClient } from '../http';
+import { withCache, withRetry } from '../enhancers';
+import { UserTransformer } from '../transformers/user-transformer';
+
+/**
+ * 用户相关API服务
+ */
+export class UserService {
+  /**
+   * 获取用户信息
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Object>} 用户信息
+   */
+  static async getUserInfo(userId) {
+    const response = await httpClient.get(`/users/${userId}`);
+    return UserTransformer.transform(response);
+  }
+  
+  /**
+   * 获取用户奖励列表
+   * @param {Object} params - 查询参数
+   * @returns {Promise<Array>} 奖励列表
+   */
+  static getUserRewards = withCache(async (params) => {
+    const response = await httpClient.get('/user/rewards', params);
+    return response.list.map(UserTransformer.transformReward);
+  });
+  
+  /**
+   * 更新用户信息
+   * @param {string} userId - 用户ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新后的用户信息
+   */
+  static updateUserInfo = withRetry(async (userId, data) => {
+    const response = await httpClient.put(`/users/${userId}`, data);
+    return UserTransformer.transform(response);
+  });
+}
+```
+
+## 3. 数据转换层
+
+使用转换器模式处理API响应数据，确保数据格式一致性和类型安全。
+
+```javascript
+// src/api/transformers/base-transformer.js
+
+/**
+ * 基础数据转换器
+ * 提供通用的数据转换方法
+ */
+export class BaseTransformer {
+  /**
+   * 日期格式化
+   * @param {string|number} timestamp - 时间戳
+   * @param {string} format - 格式化模板
+   * @returns {string} 格式化后的日期
+   */
+  static formatDate(timestamp, format = 'YYYY-MM-DD HH:mm:ss') {
+    if (!timestamp) return '';
+    return dayjs(timestamp).format(format);
+  }
+  
+  /**
+   * 数字格式化
+   * @param {number} value - 数值
+   * @param {number} precision - 精度
+   * @returns {string} 格式化后的数值
+   */
+  static formatNumber(value, precision = 2) {
+    if (typeof value !== 'number') return '0';
+    return value.toFixed(precision);
+  }
+  
+  /**
+   * 安全获取嵌套属性
+   * @param {Object} obj - 目标对象
+   * @param {string} path - 属性路径
+   * @param {*} defaultValue - 默认值
+   * @returns {*} 属性值
+   */
+  static get(obj, path, defaultValue = '') {
+    return path.split('.').reduce((o, p) => (o && o[p] !== undefined ? o[p] : defaultValue), obj);
+  }
+}
+
+// src/api/transformers/user-transformer.js
+import { BaseTransformer } from './base-transformer';
+
+/**
+ * 用户数据转换器
+ */
+export class UserTransformer extends BaseTransformer {
+  /**
+   * 转换用户信息
+   * @param {Object} data - 原始数据
+   * @returns {Object} 转换后的数据
+   */
+  static transform(data) {
+    if (!data) return null;
+    
+    return {
+      id: this.get(data, 'id', ''),
+      name: this.get(data, 'name', ''),
+      avatar: this.get(data, 'avatar', ''),
+      level: this.get(data, 'level', 0),
+      coins: this.get(data, 'balance.coins', 0),
+      isVip: this.get(data, 'vip.status') === 1,
+      vipExpireAt: this.formatDate(this.get(data, 'vip.expireAt')),
+      // 转换更多字段...
+    };
+  }
+  
+  /**
+   * 转换用户奖励
+   * @param {Object} data - 原始数据
+   * @returns {Object} 转换后的数据
+   */
+  static transformReward(data) {
+    if (!data) return null;
+    
+    return {
+      id: this.get(data, 'id', ''),
+      type: this.get(data, 'type', ''),
+      amount: this.get(data, 'amount', 0),
+      createdAt: this.formatDate(this.get(data, 'createTime')),
+      status: this.get(data, 'status', 0),
+      // 转换更多字段...
+    };
+  }
+}
+```
+
+## 4. 错误处理策略
+
+### 4.1 错误处理模式
+
+采用"Either Monad"模式处理API错误，提供更优雅的错误处理方式。
+
+```javascript
+// src/api/error-handling.js
+
+/**
+ * Either类型（函数式错误处理）
+ * 用于表示成功或失败两种可能的结果
+ */
+export class Either {
+  constructor(value, isLeft) {
+    this.value = value;
+    this.isLeft = isLeft;
+  }
+  
+  /**
+   * 创建成功结果
+   * @param {*} value - 成功值
+   * @returns {Either} Either实例
+   */
+  static right(value) {
+    return new Either(value, false);
+  }
+  
+  /**
+   * 创建失败结果
+   * @param {*} value - 错误值
+   * @returns {Either} Either实例
+   */
+  static left(value) {
+    return new Either(value, true);
+  }
+  
+  /**
+   * 包装Promise为Either
+   * @param {Promise} promise - 原始Promise
+   * @returns {Promise<Either>} Either包装的Promise
+   */
+  static async fromPromise(promise) {
+    try {
+      const value = await promise;
+      return Either.right(value);
+    } catch (error) {
+      return Either.left(error);
+    }
+  }
+  
+  /**
+   * 映射成功值
+   * @param {Function} fn - 映射函数
+   * @returns {Either} 新的Either实例
+   */
+  map(fn) {
+    if (this.isLeft) return this;
+    return Either.right(fn(this.value));
+  }
+  
+  /**
+   * 映射失败值
+   * @param {Function} fn - 映射函数
+   * @returns {Either} 新的Either实例
+   */
+  mapLeft(fn) {
+    if (!this.isLeft) return this;
+    return Either.left(fn(this.value));
+  }
+  
+  /**
+   * 获取结果值（成功或默认值）
+   * @param {*} defaultValue - 默认值
+   * @returns {*} 结果值
+   */
+  getOrElse(defaultValue) {
+    return this.isLeft ? defaultValue : this.value;
+  }
+  
+  /**
+   * 执行副作用函数
+   * @param {Function} rightFn - 成功回调
+   * @param {Function} leftFn - 失败回调
+   * @returns {Either} 当前实例
+   */
+  fold(rightFn, leftFn) {
+    if (this.isLeft) {
+      leftFn(this.value);
+    } else {
+      rightFn(this.value);
+    }
+    return this;
+  }
+}
+
+/**
+ * 在API服务中使用Either的示例
+ */
+export class SafeApiService {
+  /**
+   * 安全获取用户信息
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Either>} Either结果
+   */
+  static async getUserInfo(userId) {
+    return Either.fromPromise(httpClient.get(`/users/${userId}`))
+      .map(UserTransformer.transform)
+      .mapLeft(error => ({
+        ...error,
+        friendlyMessage: '获取用户信息失败，请稍后再试'
+      }));
+  }
+}
+```
+
+## 5. 最佳实践总结
+
+1. **分层设计**：清晰划分请求、服务、转换和错误处理层
+2. **OOP+FP融合**：使用类组织API结构，用函数式方法处理数据流
+3. **可组合性**：使用高阶函数增强API功能，如缓存、重试
+4. **错误处理**：采用Either模式处理错误，提供更优雅的错误处理流程
+5. **数据转换**：使用转换器模式确保数据一致性

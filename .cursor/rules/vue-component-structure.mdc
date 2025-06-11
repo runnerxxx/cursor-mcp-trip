@@ -1,0 +1,407 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Vue组件结构规范
+
+## 组件文件结构
+
+得间H5项目使用Vue单文件组件(`.vue`)作为组件开发标准，具有特定的结构顺序和样式处理方式。
+
+### 1. 基本结构顺序
+
+每个Vue单文件组件应当遵循以下顺序：
+
+1. **`<template>`** - HTML模板部分
+2. **`<script>`** - JavaScript逻辑部分
+3. **`<style>`** - 样式部分
+
+```vue
+<template>
+  <!-- 模板内容 -->
+</template>
+
+<script>
+export default {
+  // 组件逻辑
+}
+</script>
+
+<style lang="scss" scoped>
+/* 样式内容 */
+</style>
+```
+
+### 2. 模板部分 (`<template>`)
+
+模板部分应当遵循以下规范：
+
+- 使用语义化HTML标签
+- 每个组件模板需有一个根元素
+- 复杂的条件判断应提取为计算属性
+- 使用kebab-case命名自定义事件
+- 使用v-for时必须添加key属性
+
+```vue
+<template>
+  <div class="reward-card">
+    <h3 class="reward-card__title">{{ title }}</h3>
+    
+    <div v-if="hasReward" class="reward-card__content">
+      <span class="reward-card__amount">{{ formattedAmount }}</span>
+      <span class="reward-card__type">{{ rewardType }}</span>
+    </div>
+    
+    <div class="reward-card__actions">
+      <button 
+        class="reward-card__button" 
+        :class="buttonClasses"
+        :disabled="isDisabled"
+        @click="handleClaim"
+      >
+        {{ buttonText }}
+      </button>
+    </div>
+  </div>
+</template>
+```
+
+### 3. 脚本部分 (`<script>`)
+
+脚本部分应当遵循以下结构顺序：
+
+```vue
+<script>
+// 1. 导入语句
+import { mapState, mapGetters } from 'vuex';
+import RewardMixin from '../mixins/reward';
+
+// 2. 组件定义
+export default {
+  // a. 组件名称
+  name: 'RewardCard',
+  
+  // b. 组件注册
+  components: {
+    SubComponent,
+  },
+  
+  // c. 组合（mixins, extends）
+  mixins: [RewardMixin],
+  
+  // d. 属性
+  props: {
+    rewardId: {
+      type: String,
+      required: true
+    },
+    amount: {
+      type: Number,
+      default: 0
+    }
+  },
+  
+  // e. 数据
+  data() {
+    return {
+      isLoading: false,
+      error: null
+    };
+  },
+  
+  // f. 计算属性
+  computed: {
+    ...mapState('rewards', ['claimedRewards']),
+    ...mapGetters('rewards', ['totalAmount']),
+    
+    hasReward() {
+      return this.amount > 0;
+    },
+    
+    formattedAmount() {
+      return `${this.amount} 金币`;
+    },
+    
+    buttonClasses() {
+      return {
+        'is-primary': !this.isClaimed,
+        'is-disabled': this.isDisabled
+      };
+    },
+    
+    isDisabled() {
+      return this.isClaimed || this.isLoading;
+    },
+    
+    buttonText() {
+      if (this.isClaimed) return '已领取';
+      if (this.isLoading) return '领取中...';
+      return '立即领取';
+    },
+    
+    isClaimed() {
+      return this.claimedRewards.includes(this.rewardId);
+    }
+  },
+  
+  // g. 监听器
+  watch: {
+    rewardId: {
+      handler(newId) {
+        this.fetchRewardDetails(newId);
+      },
+      immediate: true
+    }
+  },
+  
+  // h. 生命周期钩子（按执行顺序）
+  beforeCreate() {},
+  created() {},
+  beforeMount() {},
+  mounted() {
+    this.initReward();
+  },
+  beforeUpdate() {},
+  updated() {},
+  beforeDestroy() {
+    this.cleanup();
+  },
+  destroyed() {},
+  
+  // i. 方法
+  methods: {
+    initReward() {
+      // 初始化奖励
+    },
+    
+    async handleClaim() {
+      if (this.isDisabled) return;
+      
+      this.isLoading = true;
+      
+      try {
+        await this.$store.dispatch('rewards/claimReward', {
+          id: this.rewardId,
+          amount: this.amount
+        });
+        
+        this.$emit('reward-claimed', this.rewardId);
+      } catch (error) {
+        this.error = error.message;
+      } finally {
+        this.isLoading = false;
+      }
+    },
+    
+    fetchRewardDetails(id) {
+      // 获取奖励详情
+    },
+    
+    cleanup() {
+      // 清理资源
+    }
+  }
+};
+</script>
+```
+
+### 4. 样式部分 (`<style>`)
+
+项目支持两种样式处理方式：
+
+#### 4.1 内联样式
+
+样式直接在组件文件内部，使用`scoped`属性确保样式只应用于当前组件：
+
+```vue
+<style lang="scss" scoped>
+.reward-card {
+  padding: 16px;
+  border-radius: 8px;
+  background-color: #fff;
+  
+  &__title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+  
+  &__content {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  
+  &__amount {
+    font-size: 24px;
+    color: #fc422c;
+    margin-right: 8px;
+  }
+  
+  &__type {
+    font-size: 14px;
+    color: rgba(51, 51, 51, 0.75);
+  }
+  
+  &__button {
+    width: 100%;
+    height: 40px;
+    border-radius: 20px;
+    border: none;
+    background-color: #fc422c;
+    color: #ffffff;
+    font-size: 16px;
+    
+    &.is-disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+</style>
+```
+
+#### 4.2 外部样式文件
+
+对于更复杂的组件，可以将样式提取到单独的文件中：
+
+```vue
+<style src="./RewardCard.scss" lang="scss" scoped></style>
+```
+
+然后在`RewardCard.scss`文件中编写样式：
+
+```scss
+// RewardCard.scss
+.reward-card {
+  padding: 16px;
+  border-radius: 8px;
+  background-color: #fff;
+  
+  &__title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+  
+  // 其他样式...
+}
+```
+
+## 样式规范
+
+### 1. BEM命名约定
+
+使用BEM（Block, Element, Modifier）命名约定组织CSS类名：
+
+- **Block**: 组件的主要容器类（如`.reward-card`）
+- **Element**: 组件内的元素，使用双下划线连接（如`.reward-card__title`）
+- **Modifier**: 状态或变体，使用双连字符连接（如`.reward-card--active`）
+
+```scss
+.reward-card {
+  // Block 样式
+  
+  &__title {
+    // Element 样式
+  }
+  
+  &--active {
+    // Modifier 样式
+  }
+}
+```
+
+### 2. 样式作用域
+
+- 默认使用`scoped`属性限制样式作用域
+- 需要覆盖子组件样式时，使用深度选择器`::v-deep`或`/deep/`
+
+```scss
+.reward-card {
+  ::v-deep .vant-button {
+    // 覆盖Vant组件按钮样式
+    border-radius: 4px;
+  }
+}
+```
+
+### 3. Tailwind与SCSS混合使用
+
+项目支持Tailwind与SCSS混合使用：
+
+#### 3.1 使用Tailwind原子类
+
+```vue
+<template>
+  <div class="p-16 rounded-md bg-white-op-100">
+    <h3 class="text-fs-18 font-bold text-main-op-100 mb-8">{{ title }}</h3>
+    <button class="w-full h-40 rounded-full bg-suduTheme-op-100 text-white-op-100">
+      {{ buttonText }}
+    </button>
+  </div>
+</template>
+```
+
+#### 3.2 Tailwind与SCSS结合
+
+```vue
+<template>
+  <div class="reward-card">
+    <h3 class="text-fs-18 font-bold">{{ title }}</h3>
+    <button class="reward-card__button">
+      {{ buttonText }}
+    </button>
+  </div>
+</template>
+
+<style lang="scss" scoped>
+.reward-card {
+  @apply p-16 rounded-md bg-white-op-100;
+  
+  &__button {
+    @apply w-full h-40 rounded-full bg-suduTheme-op-100 text-white-op-100;
+    
+    &:hover {
+      @apply bg-suduTheme-op-75;
+    }
+  }
+}
+</style>
+```
+
+## 组件最佳实践
+
+### 1. 逻辑复用
+
+- 使用mixins共享组件之间的通用逻辑
+- 复杂的状态管理逻辑应抽取到Vuex模块
+- 使用[组合式API模式](mdc:sudu-h5/.cursor/rules/component-design.mdc)封装可复用逻辑
+
+### 2. 组件通信
+
+- Props向下传递数据
+- 事件向上传递操作
+- 复杂组件树考虑使用Vuex进行状态管理
+
+### 3. 性能优化
+
+- 使用`v-memo`缓存模板片段
+- 大列表使用虚拟滚动
+- 合理使用`v-once`处理静态内容
+- 组件按需加载
+
+### 4. 文件组织
+
+```
+components/
+  ├── reward/
+  │   ├── RewardCard.vue
+  │   ├── RewardCard.scss
+  │   ├── RewardList.vue
+  │   └── RewardActions.vue
+  ├── common/
+  │   ├── BaseButton.vue
+  │   └── BaseDialog.vue
+```

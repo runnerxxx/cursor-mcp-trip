@@ -1,0 +1,190 @@
+---
+description: Vue2 项目代码规范和最佳实践
+globs: "*.vue,*.js,src/**/*"
+alwaysApply: true
+---
+# Vue2 项目代码规范
+
+## 组件命名规范
+
+组件名应该使用 PascalCase 命名法，例如 UserProfile.vue
+
+## Prop 定义规范
+
+Prop 必须包含类型定义和默认值，例如：
+
+```vue
+props: {
+  title: {
+    type: String,
+    default: ''
+  }
+}
+```
+
+## 生命周期钩子顺序
+
+生命周期钩子应按照 beforeCreate, created, beforeMount, mounted 的顺序排列
+
+## 方法命名规范
+
+方法名应使用 camelCase，并且动词开头，如 handleClick, fetchData, updateUser
+
+## 组件引入规范
+
+组件引入应该使用 PascalCase，并在 components 中注册
+
+## 模板指令规范
+
+v-for 指令必须搭配 :key 使用
+
+## 样式作用域规范
+
+建议使用 scoped 样式以避免样式污染，例如：
+
+```vue
+<style scoped>
+.user-card { }
+.user-card__title { }
+.user-card--active { }
+</style>
+```
+
+## 事件命名规范
+
+自定义事件名应使用 kebab-case，如 @user-click
+
+## 计算属性命名规范
+
+计算属性应使用名词或形容词
+
+## 数据属性初始化规范
+
+data 中的属性应该初始化默认值
+
+## 注释规范
+
+组件应包含必要的注释说明
+
+## 文件大小限制
+
+单个组件文件不应过大，建议不超过 300 行
+
+## 代码保留规则
+
+- 保留原有代码注释，不删除已有注释
+- CSS中不添加额外注释
+
+## 代码修改规范
+
+- 不修改已经改好的代码，除非必要
+- 保持原有注释的完整性，不随意修改或删除注释
+- 进行代码更新时，确保不破坏注释的格式和内容
+- 修复bug时，保留原始逻辑注释，并在新增代码处添加说明
+
+## API 命名规范
+
+API 方法名应使用 camelCase，并以 get/post/put/delete 等动词开头
+
+## 常量命名规范
+
+常量应使用大写字母和下划线
+
+## 变量解构规范
+
+从后端接口获取的下划线命名变量，解构时应转为驼峰命名
+
+## Vue 文件结构顺序推荐
+
+1. name
+2. components
+3. props
+4. data
+5. computed
+6. watch
+7. 生命周期钩子
+8. methods
+
+## Vue2 最佳实践
+
+- 使用 v-if 代替 v-show 处理条件渲染
+- 使用计算属性代替复杂的模板表达式
+- 使用 vuex 管理全局状态
+- 使用 mixins 复用组件逻辑
+
+## UI 框架规范 (Vant 2.x)
+
+### 按需引入
+
+```javascript
+import { Button, Toast } from 'vant';
+import 'vant/lib/button/style';
+```
+
+### 组件注册
+
+```javascript
+components: { [Button.name]: Button }
+```
+
+### 插件使用
+
+```javascript
+Vue.use(Toast);
+```
+
+## 设计系统规范
+
+### 尺寸转换
+
+所有从设计稿标注的尺寸都需要乘以2，包括宽度、高度、内外边距、字号等所有尺寸
+
+- 设计稿 180px → 代码 360px
+- 设计稿 44px → 代码 88px
+- 设计稿 14px → 代码 28px
+- 设计稿 16px → 代码 32px
+- 设计稿 12px → 代码 24px 
+
+## Tailwind CSS 使用规范
+
+### 优先使用项目已定义的Tailwind类名
+
+- 使用项目中已定义的Tailwind类名进行样式设置
+- 优先使用dejianConf.js中定义的自定义颜色和组件样式
+- 避免直接在组件中硬编码样式值，而应使用Tailwind提供的工具类
+
+### 颜色使用规范
+
+- 使用项目中定义的颜色变量，如`text-white-op-100`、`text-suduTheme-op-100`等
+- 避免使用rgba或十六进制颜色值，应使用dejianConf.js中定义的颜色变量
+
+### 自定义组件样式使用
+
+- 优先使用dejianConf.js中定义的组件样式类，如`welfare-task-block`、`wel-button-primary`等
+- 对于需要复用的样式组合，应考虑在dejianConf.js中添加新的组件样式类
+
+### 布局类使用规范
+
+- 使用Tailwind提供的布局类如`flex`、`grid`、`flex-col`等
+- 对于复杂布局，可组合使用多个Tailwind类
+- 组件间距应使用Tailwind的间距类如`m-2`、`p-4`、`gap-2`等
+
+### 响应式设计
+
+- 使用Tailwind的响应式前缀如`sm:`、`md:`、`lg:`等进行响应式布局设计
+- 移动端优先考虑基础样式，再为更大屏幕添加响应式样式
+
+### 字体大小使用规范
+
+- 使用项目中定义的字体大小类如`text-fs-28`、`text-fs-48`等
+- 确保字体大小符合设计系统规范(设计稿尺寸×2)
+
+### 避免内联样式
+
+- 避免使用内联样式`:style`，优先使用Tailwind类
+- 对于动态样式，可使用条件类名如`:class="[condition ? 'class-a' : 'class-b']"`
+
+### 复用原则
+
+- 对于频繁使用的Tailwind类组合，考虑在dejianConf.js中创建自定义组件
+- 保持组件样式的一致性，遵循项目设计系统 

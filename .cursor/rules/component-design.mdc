@@ -1,0 +1,738 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 组件设计规范
+
+## 组件设计原则
+
+在得间H5项目中，组件设计应遵循以下原则，融合OOP与FP范式：
+
+1. **组件单一职责**：每个组件只做一件事
+2. **可组合性**：小组件可组合成复杂组件
+3. **状态与UI分离**：数据逻辑与渲染逻辑分离
+4. **无副作用渲染**：渲染函数应该是纯函数
+5. **可测试性**：组件应易于单元测试
+
+## 1. 组件结构范式
+
+### 1.1 函数式组件增强的类组件
+
+```javascript
+// 基础类组件，以OOP方式组织结构
+export default {
+  name: 'RewardCard',
+  
+  props: {
+    reward: {
+      type: Object,
+      required: true
+    },
+    theme: {
+      type: String,
+      default: 'default'
+    }
+  },
+  
+  // 使用功能性的计算属性（FP思想）
+  computed: {
+    // 纯函数转换，无副作用
+    formattedAmount() {
+      return this.formatAmount(this.reward.amount);
+    },
+    
+    cardClass() {
+      return `reward-card--${this.theme}`;
+    }
+  },
+  
+  methods: {
+    // 纯函数，无副作用
+    formatAmount(amount) {
+      return amount >= 10000 
+        ? `${(amount / 10000).toFixed(1)}万` 
+        : amount.toString();
+    },
+    
+    // 事件处理方法
+    handleClick() {
+      this.$emit('click', this.reward);
+    }
+  }
+};
+```
+
+### 1.2 高阶组件模式
+
+使用高阶组件封装共享逻辑，类似于FP中的高阶函数。
+
+```javascript
+// src/components/hoc/with-loading.js
+
+/**
+ * 加载状态高阶组件
+ * @param {Object} component - 被包装的组件
+ * @returns {Object} 增强后的组件
+ */
+export const withLoading = (component) => ({
+  name: `WithLoading(${component.name})`,
+  
+  props: {
+    ...component.props,
+    loading: {
+      type: Boolean,
+      default: false
+    }
+  },
+  
+  computed: {
+    ...component.computed
+  },
+  
+  render(h) {
+    if (this.loading) {
+      return h('div', { class: 'loading-container' }, [
+        h('div', { class: 'loading-spinner' })
+      ]);
+    }
+    
+    return h(component, {
+      props: this.$props,
+      on: this.$listeners,
+      scopedSlots: this.$scopedSlots
+    });
+  }
+});
+
+// 使用高阶组件
+import RewardCard from '@/components/reward-card';
+export const LoadingRewardCard = withLoading(RewardCard);
+```
+
+### 1.3 混合状态管理
+
+结合Vue的响应式系统与FP的不可变数据原则。
+
+```javascript
+// src/features/reward/reward-state.js
+
+/**
+ * 奖励状态管理
+ * 混合OOP的封装与FP的不可变性
+ */
+export class RewardState {
+  constructor(initialRewards = []) {
+    this.state = Vue.observable({
+      rewards: initialRewards,
+      filter: 'all'
+    });
+  }
+  
+  // 获取器方法（类似FP中的selector）
+  getRewards() {
+    return [...this.state.rewards]; // 返回副本，确保不可变性
+  }
+  
+  // 过滤器方法（纯函数）
+  getFilteredRewards() {
+    const { rewards, filter } = this.state;
+    
+    if (filter === 'all') return [...rewards];
+    
+    return rewards.filter(reward => reward.type === filter);
+  }
+  
+  // 使用不可变方式更新状态
+  addReward(reward) {
+    this.state.rewards = [...this.state.rewards, reward];
+    return this; // 支持链式调用
+  }
+  
+  setFilter(filter) {
+    this.state.filter = filter;
+    return this;
+  }
+  
+  // 静态工厂方法
+  static create(initialRewards) {
+    return new RewardState(initialRewards);
+  }
+}
+
+// 在组件中使用
+export default {
+  data() {
+    return {
+      rewardState: new RewardState()
+    };
+  },
+  
+  computed: {
+    rewards() {
+      return this.rewardState.getFilteredRewards();
+    }
+  },
+  
+  methods: {
+    addNewReward(reward) {
+      this.rewardState.addReward(reward);
+    }
+  }
+};
+```
+
+## 2. 组件通信模式
+
+### 2.1 单向数据流
+
+组件之间应采用单向数据流，props向下传递，事件向上传递。
+
+```javascript
+// 父组件
+export default {
+  data() {
+    return {
+      rewards: []
+    };
+  },
+  
+  methods: {
+    handleRewardClaim(rewardId) {
+      // 处理奖励领取逻辑
+      this.rewards = this.rewards.map(reward => 
+        reward.id === rewardId 
+          ? { ...reward, claimed: true } 
+          : reward
+      );
+    }
+  },
+  
+  template: `
+    <div>
+      <reward-list 
+        :rewards="rewards" 
+        @claim="handleRwardClaim"
+      />
+    </div>
+  `
+};
+
+// 子组件
+export default {
+  name: 'RewardList',
+  
+  props: {
+    rewards: {
+      type: Array,
+      required: true
+    }
+  },
+  
+  methods: {
+    emitClaim(rewardId) {
+      this.$emit('claim', rewardId);
+    }
+  },
+  
+  template: `
+    <div class="reward-list">
+      <reward-item 
+        v-for="reward in rewards" 
+        :key="reward.id"
+        :reward="reward"
+        @claim="emitClaim(reward.id)"
+      />
+    </div>
+  `
+};
+```
+
+### 2.2 组合式API模式
+
+采用组合式API（可以提前采用Vue 3的思想）实现更灵活的状态共享。
+
+```javascript
+// src/features/reward/use-rewards.js
+import { reactive, computed } from '@vue/composition-api';
+
+/**
+ * 奖励管理Hook
+ * @param {Object} options - 配置项
+ * @returns {Object} 奖励状态和方法
+ */
+export function useRewards(options = {}) {
+  // 创建响应式状态
+  const state = reactive({
+    rewards: options.initialRewards || [],
+    loading: false,
+    filter: 'all'
+  });
+  
+  // 计算属性
+  const filteredRewards = computed(() => {
+    if (state.filter === 'all') return state.rewards;
+    return state.rewards.filter(reward => reward.type === state.filter);
+  });
+  
+  // 方法（类似FP中的reducer）
+  const addReward = (reward) => {
+    state.rewards = [...state.rewards, reward];
+  };
+  
+  const removeReward = (rewardId) => {
+    state.rewards = state.rewards.filter(r => r.id !== rewardId);
+  };
+  
+  const setFilter = (filter) => {
+    state.filter = filter;
+  };
+  
+  // 异步操作
+  const fetchRewards = async () => {
+    state.loading = true;
+    try {
+      const response = await apiClient.get('/rewards');
+      state.rewards = response.data;
+    } catch (error) {
+      console.error('Failed to fetch rewards:', error);
+    } finally {
+      state.loading = false;
+    }
+  };
+  
+  return {
+    // 状态
+    rewards: filteredRewards,
+    loading: computed(() => state.loading),
+    filter: computed(() => state.filter),
+    
+    // 方法
+    addReward,
+    removeReward,
+    setFilter,
+    fetchRewards
+  };
+}
+
+// 在组件中使用
+export default {
+  setup() {
+    const { 
+      rewards, 
+      loading, 
+      addReward, 
+      fetchRewards 
+    } = useRewards();
+    
+    // 初始化
+    fetchRewards();
+    
+    return {
+      rewards,
+      loading,
+      addReward
+    };
+  }
+};
+```
+
+## 3. 组件重用模式
+
+### 3.1 装饰器模式
+
+使用装饰器模式动态扩展组件功能。
+
+```javascript
+// src/decorators/component-decorators.js
+
+/**
+ * 埋点装饰器
+ * @param {Object} component - 组件配置
+ * @param {Object} trackConfig - 埋点配置
+ * @returns {Object} 增强的组件配置
+ */
+export function withTracking(component, trackConfig = {}) {
+  const { mounted, methods = {} } = component;
+  
+  return {
+    ...component,
+    
+    mounted() {
+      // 页面浏览埋点
+      this.$trace.pageView({
+        page_name: trackConfig.pageName || this.$options.name,
+        ...trackConfig.pageParams
+      });
+      
+      // 调用原始的mounted
+      mounted && mounted.call(this);
+    },
+    
+    methods: {
+      ...methods,
+      
+      // 增强点击事件的埋点
+      trackClick(action, params = {}) {
+        this.$trace.click({
+          action,
+          page_name: trackConfig.pageName || this.$options.name,
+          ...params
+        });
+      }
+    }
+  };
+}
+
+// 使用装饰器
+const RewardPage = withTracking({
+  name: 'RewardPage',
+  // 组件实现...
+}, {
+  pageName: 'reward_center',
+  pageParams: { source: 'home' }
+});
+```
+
+### 3.2 插件模式
+
+将通用功能封装为插件，提供全局复用。
+
+```javascript
+// src/plugins/toast-plugin.js
+
+/**
+ * Toast插件
+ * OOP形式的插件定义，内部使用FP处理数据
+ */
+export class ToastPlugin {
+  constructor(options = {}) {
+    this.options = {
+      duration: 2000,
+      position: 'middle',
+      ...options
+    };
+    
+    this.instance = null;
+  }
+  
+  // 创建Toast DOM
+  createToast(message, type) {
+    // 创建DOM实现...
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    toast.textContent = message;
+    
+    return toast;
+  }
+  
+  // 显示Toast
+  show(message, options = {}) {
+    const mergedOptions = { ...this.options, ...options };
+    const { duration, position, type = 'info' } = mergedOptions;
+    
+    // 清除现有实例
+    this.hide();
+    
+    // 创建新实例
+    this.instance = this.createToast(message, type);
+    document.body.appendChild(this.instance);
+    
+    // 自动关闭
+    setTimeout(() => this.hide(), duration);
+    
+    return this;
+  }
+  
+  // 隐藏Toast
+  hide() {
+    if (this.instance && this.instance.parentNode) {
+      this.instance.parentNode.removeChild(this.instance);
+      this.instance = null;
+    }
+    
+    return this;
+  }
+  
+  // 便捷方法
+  success(message, options) {
+    return this.show(message, { ...options, type: 'success' });
+  }
+  
+  error(message, options) {
+    return this.show(message, { ...options, type: 'error' });
+  }
+  
+  // Vue插件安装方法
+  static install(Vue, options) {
+    const toast = new ToastPlugin(options);
+    
+    // 添加实例方法
+    Vue.prototype.$toast = toast;
+    
+    // 添加全局组件
+    Vue.component('Toast', {
+      // Toast组件实现...
+    });
+  }
+}
+
+// 使用插件
+import Vue from 'vue';
+import { ToastPlugin } from '@/plugins/toast-plugin';
+
+Vue.use(ToastPlugin, {
+  duration: 3000,
+  position: 'top'
+});
+
+// 在组件中使用
+this.$toast.success('操作成功');
+```
+
+## 4. 组件开发最佳实践
+
+### 4.1 组件命名规范
+
+- 组件名使用PascalCase（首字母大写的驼峰式命名）
+- 基础通用组件使用Base前缀
+- 单例组件使用The前缀
+- 与父组件紧密耦合的子组件使用父组件名作为前缀
+
+```
+components/
+  ├── BaseButton.vue       # 基础按钮组件
+  ├── BaseInput.vue        # 基础输入框组件
+  ├── TheHeader.vue        # 全局头部组件
+  ├── TheFooter.vue        # 全局底部组件
+  ├── RewardCard/          # 奖励卡片组件目录
+  │   ├── index.vue        # 主组件
+  │   ├── RewardCardTitle.vue    # 子组件
+  │   └── RewardCardActions.vue  # 子组件
+```
+
+### 4.2 Props定义最佳实践
+
+- 使用对象定义props，便于类型检查和默认值设置
+- 为所有props提供类型和默认值
+- 使用函数返回引用类型的默认值
+
+```javascript
+export default {
+  name: 'RewardCard',
+  
+  props: {
+    // 基本类型
+    title: {
+      type: String,
+      required: true
+    },
+    
+    // 数字类型带验证
+    amount: {
+      type: Number,
+      required: true,
+      validator: value => value >= 0
+    },
+    
+    // 对象类型带默认值
+    config: {
+      type: Object,
+      default: () => ({
+        showImage: true,
+        theme: 'default'
+      })
+    },
+    
+    // 数组类型带默认值
+    tags: {
+      type: Array,
+      default: () => []
+    }
+  }
+};
+```
+
+### 4.3 通用组件开发模板
+
+每个组件应遵循以下结构模板：
+
+```javascript
+// ComponentName.vue
+<template>
+  <div :class="rootClasses">
+    <!-- 组件内容结构 -->
+    <slot name="header" v-if="$slots.header"></slot>
+    
+    <div class="component__content">
+      {{ processedContent }}
+    </div>
+    
+    <slot name="footer" v-if="$slots.footer"></slot>
+  </div>
+</template>
+
+<script>
+/**
+ * 组件描述
+ * @displayName ComponentName
+ */
+export default {
+  name: 'ComponentName',
+  
+  // 组件属性
+  props: {
+    // ...props定义
+  },
+  
+  // 数据
+  data() {
+    return {
+      // ...本地状态
+    };
+  },
+  
+  // 计算属性（尽量使用纯函数实现）
+  computed: {
+    rootClasses() {
+      return {
+        'component': true,
+        [`component--${this.theme}`]: Boolean(this.theme)
+      };
+    },
+    
+    processedContent() {
+      // 使用纯函数处理内容
+      return this.processContent(this.content);
+    }
+  },
+  
+  // 方法（区分纯函数和副作用函数）
+  methods: {
+    // 纯函数
+    processContent(content) {
+      return content.toUpperCase();
+    },
+    
+    // 事件处理函数
+    handleClick(event) {
+      this.$emit('click', event);
+    }
+  }
+};
+</script>
+
+<style lang="scss" scoped>
+.component {
+  /* 组件样式 */
+}
+</style>
+```
+
+## 5. 性能优化
+
+### 5.1 组件延迟加载
+
+使用异步组件实现按需加载。
+
+```javascript
+// 异步加载组件
+const AsyncRewardDetail = () => ({
+  component: import('@/components/reward-detail'),
+  loading: LoadingComponent,
+  error: ErrorComponent,
+  delay: 200,
+  timeout: 5000
+});
+
+export default {
+  components: {
+    RewardDetail: AsyncRewardDetail
+  }
+};
+```
+
+### 5.2 列表渲染优化
+
+使用虚拟滚动优化大列表渲染性能。
+
+```javascript
+// 使用虚拟滚动组件
+import VirtualList from 'vue-virtual-scroll-list';
+
+export default {
+  components: {
+    VirtualList
+  },
+  
+  data() {
+    return {
+      rewards: [], // 大量数据
+      itemHeight: 60
+    };
+  },
+  
+  template: `
+    <virtual-list
+      :data-key="'id'"
+      :data-sources="rewards"
+      :data-component="itemComponent"
+      :estimate-size="itemHeight"
+    />
+  `,
+  
+  computed: {
+    itemComponent() {
+      return {
+        template: `
+          <div class="reward-item">
+            <h3>{{ source.title }}</h3>
+            <p>{{ source.amount }}</p>
+          </div>
+        `,
+        props: {
+          source: Object
+        }
+      };
+    }
+  }
+};
+```
+
+### 5.3 计算属性缓存
+
+利用计算属性的缓存特性提高性能。
+
+```javascript
+export default {
+  data() {
+    return {
+      rewards: []
+    };
+  },
+  
+  computed: {
+    // 昂贵计算只在依赖项变化时执行
+    totalRewardAmount() {
+      console.log('Computing total...');
+      return this.rewards.reduce((sum, reward) => sum + reward.amount, 0);
+    },
+    
+    // 根据类型分组的奖励
+    rewardsByType() {
+      return this.rewards.reduce((result, reward) => {
+        if (!result[reward.type]) {
+          result[reward.type] = [];
+        }
+        result[reward.type].push(reward);
+        return result;
+      }, {});
+    },
+    
+    // 二级计算属性，依赖于其他计算属性
+    hasHighValueRewards() {
+      return this.totalRewardAmount > 10000;
+    }
+  }
+};
+```

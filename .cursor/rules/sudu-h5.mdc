@@ -1,0 +1,404 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 速读H5项目编码规范与架构指南
+
+## 项目概述
+速读H5是一个基于Vue2的多页面移动端项目，主要提供在线阅读服务，包含会员、订单相关页面。项目使用Vite作为构建工具，采用Sass和Tailwind CSS进行样式处理。项目采用多页面架构，每个页面独立运行，不依赖Vue Router和Vuex等单页应用框架。
+
+## 规范文档
+项目包含以下规范文档，开发时请参考相应规范：
+
+1. [API设计规范](mdc:sudu-h5/sudu-h5/sudu-h5/.cursor/rules/api-design.mdc) - API接口设计原则与规范
+2. [组件设计规范](mdc:sudu-h5/sudu-h5/sudu-h5/.cursor/rules/component-design.mdc) - 组件设计原则与最佳实践
+3. [Vue组件结构规范](mdc:sudu-h5/sudu-h5/sudu-h5/.cursor/rules/vue-component-structure.mdc) - Vue组件的结构组织与代码规范
+4. [Tailwind使用规范](mdc:sudu-h5/sudu-h5/sudu-h5/.cursor/rules/tailwind-usage.mdc) - Tailwind CSS的使用指南
+5. [状态管理规范](mdc:sudu-h5/sudu-h5/sudu-h5/.cursor/rules/state-management.mdc) - 状态管理模式与实践
+
+## 项目结构
+
+### 1. 关键文件与目录
+```
+src/
+  ├── api/               # API接口封装
+  ├── assets/            # 静态资源
+  ├── components/        # 可复用组件
+  ├── features/          # 业务功能模块
+  ├── pages/             # 页面入口文件
+  │   ├── home/          # 首页相关文件
+  │   ├── reader/        # 阅读器相关文件
+  │   ├── user/          # 用户中心相关文件
+  │   └── order/         # 订单相关文件
+  ├── base/              # 基础配置与服务
+  ├── util/              # 工具函数与类
+  ├── styles/            # 全局样式
+  └── main.js            # 公共入口文件
+```
+
+## 代码规范与范式
+
+### 1. 命名约定
+- **文件夹命名**：使用kebab-case（如`user-profile`）
+- **组件文件命名**：使用PascalCase（如`UserProfile.vue`）
+- **JS/TS文件命名**：使用camelCase（如`userService.js`）
+- **CSS/SCSS文件命名**：与对应组件保持一致（如`UserProfile.scss`）
+- **组件使用PascalCase命名**
+- **组件属性使用camelCase命名**
+- **组件事件使用kebab-case命名并以on开头**
+
+### 2. 编程范式融合
+项目鼓励OOP和函数式编程(FP)的融合实践，遵循以下原则：
+
+#### 2.1 OOP架构中的FP实现
+- 类方法应尽可能使用纯函数实现
+- 使用高阶函数动态扩展类功能
+- 组件设计应符合SOLID原则
+
+```javascript
+// 示例：OOP架构中使用纯函数
+export class RewardCalculator {
+  // 纯函数实现，无副作用
+  static calculate(items) {
+    return items.reduce((sum, item) => sum + item.value, 0);
+  }
+  
+  // 高阶函数扩展功能
+  static withLogging(fn) {
+    return (...args) => {
+      console.log('计算奖励值:', args);
+      return fn(...args);
+    };
+  }
+}
+
+// 使用高阶函数动态扩展
+const loggedCalculate = RewardCalculator.withLogging(RewardCalculator.calculate);
+```
+
+#### 2.2 FP流程中的OOP组织
+- 将FP管道封装为类静态方法
+- 使用不可变数据处理状态变更
+- 通过模式模式隔离副作用
+
+```javascript
+// 示例：FP管道封装为类方法
+import { compose } from 'lodash-es';
+
+export class DataProcessor {
+  // 静态方法作为数据管道
+  static process = (data) => compose(
+    this.cleanData,
+    this.validate,
+    this.transform
+  )(data);
+  
+  // 纯函数组件
+  static cleanData = (data) => data.filter(Boolean);
+  static validate = (data) => data.map(item => ({ ...item, valid: Boolean(item.id) }));
+  static transform = (data) => data.map(item => ({ ...item, displayValue: `${item.value}金币` }));
+}
+```
+
+### 3. 设计模式应用
+
+#### 3.1 单例模式
+适用于全局状态管理、缓存管理等场景。
+
+```javascript
+// 示例：单例模式实现的缓存管理器
+export class CacheManager {
+  static instance = null;
+  
+  constructor() {
+    if (CacheManager.instance) {
+      return CacheManager.instance;
+    }
+    
+    this.cache = {};
+    CacheManager.instance = this;
+  }
+  
+  set(key, value, expiration = 3600000) {
+    this.cache[key] = {
+      value,
+      expiration: Date.now() + expiration
+    };
+  }
+  
+  get(key) {
+    const item = this.cache[key];
+    if (!item) return null;
+    
+    if (Date.now() > item.expiration) {
+      delete this.cache[key];
+      return null;
+    }
+    
+    return item.value;
+  }
+}
+
+// 使用
+const cacheManager = new CacheManager();
+```
+
+#### 3.2 策略模式
+适用于处理多种算法、业务逻辑的场景。
+
+```javascript
+// 示例：奖励计算的策略模式
+export class RewardStrategy {
+  static strategies = {
+    // 普通用户奖励计算
+    normal: (amount) => amount,
+    
+    // VIP用户奖励计算
+    vip: (amount) => amount * 1.5,
+    
+    // 超级VIP用户奖励计算
+    superVip: (amount) => amount * 2 + 100
+  };
+  
+  static calculate(userType, amount) {
+    const strategy = this.strategies[userType] || this.strategies.normal;
+    return strategy(amount);
+  }
+}
+```
+
+#### 3.3 工厂模式
+适用于组件创建、API调用封装等场景。
+
+```javascript
+// 示例：对话框工厂
+export class DialogFactory {
+  static create(type, props = {}) {
+    const dialogMap = {
+      reward: () => import('@/components/wel-reward-dialog'),
+      login: () => import('@/components/wel-login-dialog'),
+      task: () => import('@/components/wel-task-dialog')
+    };
+    
+    if (!dialogMap[type]) {
+      throw new Error(`未知的对话框类型: ${type}`);
+    }
+    
+    return dialogMap[type]().then(module => {
+      return { component: module.default, props };
+    });
+  }
+}
+```
+
+### 4. SOLID原则实践
+
+#### 4.1 单一职责原则 (SRP)
+每个类应该只有一个职责，每个函数应该只做一件事。
+
+```javascript
+// 不推荐：混合了数据获取和展示逻辑
+methods: {
+  async fetchAndShowUserData() {
+    const data = await this.$api.getUserData();
+    this.userData = data;
+    this.formatUserData();
+    this.showUserDialog();
+  }
+}
+
+// 推荐：分离职责
+methods: {
+  async fetchUserData() {
+    return await this.$api.getUserData();
+  },
+  
+  processUserData(data) {
+    return { ...data, formattedName: data.name.toUpperCase() };
+  },
+  
+  showUserData(processedData) {
+    this.userData = processedData;
+    this.showUserDialog();
+  },
+  
+  // 组合以上函数
+  async handleUserData() {
+    const data = await this.fetchUserData();
+    const processed = this.processUserData(data);
+    this.showUserData(processed);
+  }
+}
+```
+
+#### 4.2 开闭原则 (OCP)
+软件实体应该对扩展开放，对修改关闭。
+
+```javascript
+// 示例：使用装饰器模式实现开闭原则
+export const withTracking = (component) => ({
+  extends: component,
+  
+  mounted() {
+    this.$nextTick(() => {
+      // 添加埋点逻辑
+      this.$trace.pageView();
+    });
+    
+    // 调用原组件的mounted
+    component.mounted && component.mounted.call(this);
+  },
+  
+  methods: {
+    onClick(...args) {
+      // 添加点击埋点
+      this.$trace.click(this.$options.name);
+      
+      // 调用原组件的onClick
+      component.methods.onClick && component.methods.onClick.apply(this, args);
+    }
+  }
+});
+
+// 使用
+export default withTracking(MyComponent);
+```
+
+#### 4.3 依赖倒置原则 (DIP)
+高层模块不应该依赖低层模块，两者都应该依赖抽象。
+
+```javascript
+// 不推荐：直接依赖具体实现
+methods: {
+  saveUser() {
+    localStorage.setItem('user', JSON.stringify(this.user));
+  }
+}
+
+// 推荐：依赖抽象接口
+// 抽象存储接口
+export class StorageService {
+  static save(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+  
+  static get(key) {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  }
+}
+
+// 使用抽象接口
+methods: {
+  saveUser() {
+    StorageService.save('user', this.user);
+  }
+}
+```
+
+### 5. 状态管理
+- 本地组件状态使用Vue的data属性
+- 跨页面状态考虑使用本地存储或状态服务
+- 使用计算属性派生状态
+- 避免直接修改props
+
+```javascript
+// 示例：简单的状态服务
+export class AppState {
+  static instance = null;
+  
+  constructor() {
+    if (AppState.instance) {
+      return AppState.instance;
+    }
+    
+    this._state = {};
+    this._listeners = {};
+    AppState.instance = this;
+  }
+  
+  setState(key, value) {
+    this._state[key] = value;
+    this._notifyListeners(key, value);
+  }
+  
+  getState(key) {
+    return this._state[key];
+  }
+  
+  subscribe(key, callback) {
+    if (!this._listeners[key]) {
+      this._listeners[key] = [];
+    }
+    this._listeners[key].push(callback);
+    
+    return () => {
+      this._listeners[key] = this._listeners[key].filter(cb => cb !== callback);
+    };
+  }
+  
+  _notifyListeners(key, value) {
+    if (!this._listeners[key]) return;
+    this._listeners[key].forEach(callback => callback(value));
+  }
+}
+
+// 使用
+const appState = new AppState();
+```
+
+### 6. 性能优化
+- 合理使用v-if和v-show
+- 大列表使用虚拟滚动
+- 使用v-once渲染静态内容
+- 组件按需导入
+- 提取可复用的逻辑为mixins或工具类
+
+## 代码注释规范
+
+每个文件和方法应该有清晰的JSDoc注释：
+
+### 1. 文件头注释
+```js
+/**
+ * @description 用户信息服务，处理用户数据的获取和更新
+ * @author 张三
+ * @date 2022-10-01
+ */
+```
+
+### 2. 方法注释
+```javascript
+/**
+ * 计算用户奖励金额
+ * @param {Object} user - 用户信息
+ * @param {String} user.type - 用户类型：normal|vip|superVip
+ * @param {Number} amount - 基础奖励金额
+ * @returns {Number} 计算后的奖励金额
+ * @example
+ * // 计算VIP用户的100金币奖励
+ * const reward = calculateReward({ type: 'vip' }, 100); // 返回150
+ */
+function calculateReward(user, amount) {
+  return RewardStrategy.calculate(user.type, amount);
+}
+```
+
+### 3. 复杂逻辑注释
+```js
+// 根据用户等级计算折扣比例
+// 1. VIP用户享受9折优惠
+// 2. SVIP用户享受8折优惠
+// 3. 活动期间所有用户额外享受95折优惠
+```
+
+## 辅助工具
+
+### 推荐的VSCode插件
+
+- Volar: Vue 3语法支持
+- ESLint: 代码质量检查
+- Prettier: 代码格式化
+- Tailwind CSS IntelliSense: Tailwind CSS智能提示
+- GitLens: Git增强功能
