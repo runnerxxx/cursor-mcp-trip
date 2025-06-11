@@ -6,12 +6,21 @@
   "type": "module",
   "scripts": {
     "start": "node proxy-server.js",
-    "dev": "node proxy-server.js"
+    "dev": "node proxy-server.js",
+    "build": "echo 'No build step required - static files ready for deployment'",
+    "test": "echo 'No tests specified'",
+    "lint": "echo 'No linting configured'",
+    "deploy": "npm start"
   },
-  "keywords": ["usr", "encrypt", "proxy", "cors"],
+  "keywords": ["usr", "encrypt", "proxy", "cors", "nodejs", "html"],
   "author": "xulijing",
   "license": "MIT",
   "engines": {
     "node": ">=14.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/runnerxxx/cursor-mcp-trip.git"
+  },
+  "homepage": "https://github.com/runnerxxx/cursor-mcp-trip#readme"
 }
