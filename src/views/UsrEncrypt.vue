@@ -1,10 +1,29 @@
 <template>
   <div class="usr-encrypt-page">
+    <!-- 动态背景元素 -->
+    <div class="bg-animation">
+      <div class="floating-shape shape-1"></div>
+      <div class="floating-shape shape-2"></div>
+      <div class="floating-shape shape-3"></div>
+      <div class="floating-shape shape-4"></div>
+      <div class="floating-shape shape-5"></div>
+      <div class="floating-shape shape-6"></div>
+    </div>
+    
     <div class="encrypt-container">
-      <h1 class="page-title">USR信息加密工具</h1>
+      <!-- 容器内装饰元素 -->
+      <div class="container-decoration">
+        <div class="deco-circle deco-1"></div>
+        <div class="deco-circle deco-2"></div>
+      </div>
+      
+      <h1 class="page-title">🐌 SnailLab</h1>
+      <p class="page-subtitle">蜗牛实验室 · 稳步前进，持续学习</p>
       
       <div class="status-notice">
-        • 支持所有产品的AppID选择和USR信息加密
+        • 这是一个学习项目，用于实践前端技术和工具开发
+        • 当前功能：USR信息加密工具，支持多种AppID选择
+        • 直接调用公网接口，响应速度快，延迟低
       </div>
       
       <form @submit.prevent="handleSubmit" class="encrypt-form">
@@ -57,7 +76,17 @@
       
       <div v-if="result.show" class="result-section">
         <h3 class="result-title">加密结果</h3>
-        <div class="result-content" :class="result.type">{{ result.message }}</div>
+        <div class="result-content" :class="result.type">
+          <div class="result-message">{{ result.message }}</div>
+          <div v-if="result.type === 'success' && result.encryptedData" class="encrypted-result">
+            <div class="encrypted-label">加密结果：</div>
+            <div class="encrypted-value">{{ result.encryptedData }}</div>
+            <button @click="copyToClipboard" class="copy-btn" :disabled="isCopying">
+              <span v-if="isCopying">已复制!</span>
+              <span v-else>📋 复制</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -65,6 +94,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
+import { encryptUsr } from '../api'
 
 // 类型定义
 interface AppIdOption {
@@ -81,6 +111,7 @@ interface Result {
   show: boolean
   message: string
   type: 'success' | 'error'
+  encryptedData?: string
 }
 
 // 响应式数据
@@ -91,6 +122,7 @@ const formData = ref<FormData>({
 
 const isDropdownOpen = ref<boolean>(false)
 const isLoading = ref<boolean>(false)
+const isCopying = ref<boolean>(false)
 const result = ref<Result>({
   show: false,
   message: '',
@@ -176,11 +208,12 @@ const handleKeydown = (e: KeyboardEvent): void => {
   }
 }
 
-const showResult = (message: string, type: 'success' | 'error' = 'success'): void => {
+const showResult = (message: string, type: 'success' | 'error' = 'success', encryptedData?: string): void => {
   result.value = {
     show: true,
     message,
-    type
+    type,
+    encryptedData
   }
   
   nextTick(() => {
@@ -203,27 +236,53 @@ const handleSubmit = async (): Promise<void> => {
   isLoading.value = true
   
   try {
-    // 使用Vite代理或直接调用代理接口
-    const proxyUrl = `/proxy?usr=${encodeURIComponent(usr)}&p29=${encodeURIComponent(p29)}`
-    const response = await fetch(proxyUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
+    // 调用封装的API方法
+    const encryptedResult = await encryptUsr({ usr, p29 })
     
-    if (response.ok) {
-      const resultText = await response.text()
-      showResult(`✅ 加密成功！\n\n原始USR: ${usr}\nAppID: ${p29}\n加密结果: ${resultText}`, 'success')
-    } else {
-      throw new Error(`服务器响应错误: HTTP ${response.status}`)
-    }
+    showResult(`✅ 加密成功！\n\n原始USR: ${usr}\nAppID: ${p29}`, 'success', encryptedResult)
   } catch (error) {
     console.error('加密请求失败:', error)
     const errorMessage = error instanceof Error ? error.message : '未知错误'
-    showResult(`❌ 加密失败: ${errorMessage}\n\n请检查网络连接或联系管理员`, 'error')
+    showResult(`❌ 加密失败: ${errorMessage}`, 'error')
   } finally {
     isLoading.value = false
+  }
+}
+
+// 复制到剪贴板
+const copyToClipboard = async (): Promise<void> => {
+  if (!result.value.encryptedData) return
+  
+  try {
+    await navigator.clipboard.writeText(result.value.encryptedData)
+    isCopying.value = true
+    
+    // 2秒后恢复按钮状态
+    setTimeout(() => {
+      isCopying.value = false
+    }, 2000)
+  } catch (error) {
+    console.error('复制失败:', error)
+    
+    // 降级方案：使用传统的复制方法
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = result.value.encryptedData || ''
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      
+      isCopying.value = true
+      setTimeout(() => {
+        isCopying.value = false
+      }, 2000)
+    } catch (fallbackError) {
+      console.error('降级复制方案也失败:', fallbackError)
+      alert('复制失败，请手动选择文本复制')
+    }
   }
 }
 
@@ -240,39 +299,66 @@ document.addEventListener('click', handleClickOutside)
 
 <style scoped>
 .usr-encrypt-page {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(179, 127, 235, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(211, 173, 247, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(179, 127, 235, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  position: relative;
+  overflow: hidden;
 }
 
 .encrypt-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
   padding: 40px;
   width: 100%;
   max-width: 600px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
 }
 
 .page-title {
   text-align: center;
-  color: #333;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 8px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.page-subtitle {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
   margin-bottom: 30px;
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 400;
+  margin-top: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .status-notice {
-  background: #d1ecf1;
-  border: 1px solid #bee5eb;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   padding: 15px;
   margin-bottom: 20px;
   font-size: 14px;
-  color: #0c5460;
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .encrypt-form {
@@ -286,25 +372,29 @@ document.addEventListener('click', handleClickOutside)
 .form-label {
   display: block;
   margin-bottom: 8px;
-  color: #555;
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
   font-size: 14px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .form-input {
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   font-size: 16px;
-  transition: border-color 0.3s ease;
-  background: #f8f9fa;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #667eea;
-  background: white;
+  border-color: rgba(179, 127, 235, 0.6);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(179, 127, 235, 0.1);
 }
 
 .select-container {
@@ -314,18 +404,21 @@ document.addEventListener('click', handleClickOutside)
 .select-input {
   width: 100%;
   padding: 12px 40px 12px 16px;
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   font-size: 16px;
-  background: #f8f9fa;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
   cursor: pointer;
-  transition: border-color 0.3s ease;
+  transition: all 0.3s ease;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .select-input:focus {
   outline: none;
-  border-color: #667eea;
-  background: white;
+  border-color: rgba(179, 127, 235, 0.6);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(179, 127, 235, 0.1);
 }
 
 .select-arrow {
@@ -334,7 +427,7 @@ document.addEventListener('click', handleClickOutside)
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
   transition: transform 0.3s ease;
 }
 
@@ -373,14 +466,14 @@ document.addEventListener('click', handleClickOutside)
 }
 
 .select-option.selected {
-  background-color: #667eea;
+  background-color: #b37feb;
   color: white;
 }
 
 .submit-btn {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #b37feb 0%, #d3adf7 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -392,7 +485,7 @@ document.addEventListener('click', handleClickOutside)
 
 .submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102,126,234,0.4);
+  box-shadow: 0 8px 20px rgba(179, 127, 235, 0.4);
 }
 
 .submit-btn:active {
@@ -423,10 +516,73 @@ document.addEventListener('click', handleClickOutside)
   background: white;
   padding: 15px;
   border-radius: 6px;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid #b37feb;
+}
+
+.result-message {
   word-break: break-all;
   font-family: 'Courier New', monospace;
   white-space: pre-line;
+  margin-bottom: 15px;
+}
+
+.encrypted-result {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 10px;
+}
+
+.encrypted-label {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.encrypted-value {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  word-break: break-all;
+  color: #212529;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.copy-btn {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.copy-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.copy-btn:active {
+  transform: translateY(0);
+}
+
+.copy-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .loading {
@@ -434,7 +590,7 @@ document.addEventListener('click', handleClickOutside)
   width: 20px;
   height: 20px;
   border: 3px solid #f3f3f3;
-  border-top: 3px solid #667eea;
+  border-top: 3px solid #b37feb;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-right: 10px;
@@ -461,6 +617,158 @@ document.addEventListener('click', handleClickOutside)
   transform: translateY(-50%) rotate(180deg) !important;
 }
 
+/* 动态背景样式 */
+.bg-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.floating-shape {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.shape-1 {
+  width: 80px;
+  height: 80px;
+  top: 10%;
+  left: 10%;
+  animation: float1 6s ease-in-out infinite;
+}
+
+.shape-2 {
+  width: 120px;
+  height: 120px;
+  top: 20%;
+  right: 15%;
+  animation: float2 8s ease-in-out infinite;
+  background: rgba(179, 127, 235, 0.15);
+}
+
+.shape-3 {
+  width: 60px;
+  height: 60px;
+  bottom: 30%;
+  left: 20%;
+  animation: float3 7s ease-in-out infinite;
+  border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+}
+
+.shape-4 {
+  width: 100px;
+  height: 100px;
+  bottom: 20%;
+  right: 20%;
+  animation: float4 9s ease-in-out infinite;
+  background: rgba(211, 173, 247, 0.12);
+}
+
+.shape-5 {
+  width: 40px;
+  height: 40px;
+  top: 60%;
+  left: 50%;
+  animation: float5 5s ease-in-out infinite;
+  border-radius: 20% 80% 80% 20% / 20% 20% 80% 80%;
+}
+
+.shape-6 {
+  width: 90px;
+  height: 90px;
+  top: 40%;
+  right: 40%;
+  animation: float6 10s ease-in-out infinite;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(180deg); }
+}
+
+@keyframes float2 {
+  0%, 100% { transform: translateX(0px) rotate(0deg); }
+  50% { transform: translateX(20px) rotate(-180deg); }
+}
+
+@keyframes float3 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  33% { transform: translateY(-15px) translateX(15px) rotate(120deg); }
+  66% { transform: translateY(15px) translateX(-15px) rotate(240deg); }
+}
+
+@keyframes float4 {
+  0%, 100% { transform: translateY(0px) scale(1) rotate(0deg); }
+  50% { transform: translateY(-25px) scale(1.1) rotate(180deg); }
+}
+
+@keyframes float5 {
+  0%, 100% { transform: translateX(0px) rotate(0deg); }
+  25% { transform: translateX(10px) rotate(90deg); }
+  50% { transform: translateX(-10px) rotate(180deg); }
+  75% { transform: translateX(5px) rotate(270deg); }
+}
+
+@keyframes float6 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  20% { transform: translateY(-10px) translateX(10px) rotate(72deg); }
+  40% { transform: translateY(10px) translateX(20px) rotate(144deg); }
+  60% { transform: translateY(-5px) translateX(-10px) rotate(216deg); }
+  80% { transform: translateY(15px) translateX(-20px) rotate(288deg); }
+}
+
+.encrypt-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* 容器内装饰元素 */
+.container-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.deco-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.deco-1 {
+  width: 150px;
+  height: 150px;
+  top: -75px;
+  right: -75px;
+  animation: rotate 20s linear infinite;
+}
+
+.deco-2 {
+  width: 100px;
+  height: 100px;
+  bottom: -50px;
+  left: -50px;
+  animation: rotate 15s linear infinite reverse;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .usr-encrypt-page {
@@ -473,6 +781,15 @@ document.addEventListener('click', handleClickOutside)
   
   .page-title {
     font-size: 24px;
+  }
+  
+  /* 移动端减少动画元素 */
+  .shape-3, .shape-5, .shape-6 {
+    display: none;
+  }
+  
+  .floating-shape {
+    opacity: 0.6;
   }
 }
 </style> 

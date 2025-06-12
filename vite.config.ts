@@ -15,8 +15,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/proxy': {
-        target: 'http://dejian-welfare-welfare-gateway.test.svc.zhangyue-inc.com',
+        target: 'https://welfare-gateway.palmestore.com',
         changeOrigin: true,
+        secure: true,
         rewrite: (path) => {
           // 将 /proxy?usr=xxx&p29=xxx 转换为 /gateway/user/encrypt?usr=xxx&p29=xxx
           const url = new URL(path, 'http://localhost')

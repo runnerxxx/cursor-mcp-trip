@@ -11,7 +11,7 @@ const routes = [
     name: 'UsrEncrypt',
     component: UsrEncrypt,
     meta: {
-      title: 'USR信息加密工具'
+      title: '🐌 SnailLab - 蜗牛实验室'
     }
   }
 ]
