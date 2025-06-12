@@ -2,7 +2,7 @@
  * @Author: xulijing xulijing@zhangyue.com
  * @Date: 2025-04-29 11:49:23
  * @LastEditors: xulijing xulijing@zhangyue.com
- * @LastEditTime: 2025-05-21 15:09:12
+ * @LastEditTime: 2025-06-12 16:26:12
  * @Description: file content
  * @FilePath: /my-vue-app/vite.config.ts
  */

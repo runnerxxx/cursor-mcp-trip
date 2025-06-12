@@ -63,3 +63,4 @@ tmp/
 # Build outputs
 dist/
 build/
+.vercel
