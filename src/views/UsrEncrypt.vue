@@ -21,9 +21,7 @@
       <p class="page-subtitle">蜗牛实验室 · 稳步前进，持续学习</p>
       
       <div class="status-notice">
-        • 这是一个学习项目，用于实践前端技术和工具开发
         • 当前功能：USR信息加密工具，支持多种AppID选择
-        • 直接调用公网接口，响应速度快，延迟低
       </div>
       
       <form @submit.prevent="handleSubmit" class="encrypt-form">
@@ -36,36 +34,21 @@
             placeholder="请输入原始USR信息，例如：tj1279771586" 
             v-model="formData.usr"
             required
-          >
+          />
         </div>
         
         <div class="form-group">
-          <label class="form-label" for="appIdSelect">AppID</label>
-          <div class="select-container" ref="selectContainer">
-            <input 
-              type="text" 
-              id="appIdSelect" 
-              class="select-input" 
-              placeholder="请选择或输入AppID" 
-              autocomplete="off"
-              v-model="formData.appId"
-              @click="toggleDropdown"
-              @input="handleInput"
-              @keydown="handleKeydown"
-              required
-            >
-            <span class="select-arrow" :class="{ 'arrow-rotate': isDropdownOpen }">▼</span>
-            <div class="select-dropdown" :class="{ show: isDropdownOpen }">
-              <div 
-                v-for="option in filteredOptions" 
-                :key="option.value"
-                class="select-option"
-                @click="selectOption(option)"
-              >
-                {{ option.label }}
-              </div>
-            </div>
+          <label class="form-label">AppID</label>
+          <div class="custom-select">
+            <a-select
+            v-model="formData.appId"
+            placeholder="请选择AppID"
+            :options="selectOptions"
+            :filter-option="true"
+            allow-search
+          />
           </div>
+         
         </div>
         
         <button type="submit" class="submit-btn" :disabled="isLoading">
@@ -98,7 +81,7 @@ import { encryptUsr } from '../api'
 
 // 类型定义
 interface AppIdOption {
-  label: string
+  text: string
   value: string
 }
 
@@ -120,7 +103,6 @@ const formData = ref<FormData>({
   appId: ''
 })
 
-const isDropdownOpen = ref<boolean>(false)
 const isLoading = ref<boolean>(false)
 const isCopying = ref<boolean>(false)
 const result = ref<Result>({
@@ -129,85 +111,52 @@ const result = ref<Result>({
   type: 'success'
 })
 
-const selectContainer = ref<HTMLElement | null>(null)
-
 // AppID选项数据
 const appIdOptions = ref<AppIdOption[]>([
-  {"label": "得间小说安卓 (zy4248ba)", "value": "zy4248ba"},
-  {"label": "得间小说 iOS (zy4248ba)", "value": "zy4248ba"},
-  {"label": "得间小说安卓极速版 (zy8f2e24)", "value": "zy8f2e24"},
-  {"label": "得间小说 iOS 极速版 (zy8f2e24)", "value": "zy8f2e24"},
-  {"label": "追读 iOS (zybc0e74)", "value": "zybc0e74"},
-  {"label": "七读小说 (zy819b7a)", "value": "zy819b7a"},
-  {"label": "得间畅听 (zy9b17a7)", "value": "zy9b17a7"},
-  {"label": "琅阅小说 (zy21c192)", "value": "zy21c192"},
-  {"label": "得间大字版 (zy78e04c)", "value": "zy78e04c"},
-  {"label": "阅瓣小说 (zy7595fe)", "value": "zy7595fe"},
-  {"label": "贤读小说 (zyf36a0f)", "value": "zyf36a0f"},
-  {"label": "追读小说 (zyd0d2ca)", "value": "zyd0d2ca"},
-  {"label": "袋鼠点点小说 (zybd351b)", "value": "zybd351b"},
-  {"label": "盛读小说 (zy0903f1)", "value": "zy0903f1"},
-  {"label": "速读小说 (zyb03dd4)", "value": "zyb03dd4"},
-  {"label": "浩看小说 (zy613a68)", "value": "zy613a68"},
-  {"label": "秘读小说 (zy4cb605)", "value": "zy4cb605"},
-  {"label": "浩阅小说 (zy8eef2a)", "value": "zy8eef2a"},
-  {"label": "袋鼠点点短视频 (zyf4648c)", "value": "zyf4648c"},
-  {"label": "枫以短视频 (zy3d1ef1)", "value": "zy3d1ef1"},
-  {"label": "薏米短剧 (zy9351ae)", "value": "zy9351ae"},
-  {"label": "速看短剧 (zya8dad8)", "value": "zya8dad8"},
-  {"label": "伊看短剧 (zy6ee66f)", "value": "zy6ee66f"},
-  {"label": "卡看 (zya3c0e0)", "value": "zya3c0e0"},
-  {"label": "北京主体伊看 (zy8b0c8f)", "value": "zy8b0c8f"},
-  {"label": "得间努比亚小说 (zye4a38c)", "value": "zye4a38c"},
-  {"label": "得间鸿蒙 (zy4248ba)", "value": "zy4248ba"},
-  {"label": "鸿蒙-七读小说 (zy819b7a)", "value": "zy819b7a"},
-  {"label": "鸿蒙-浩看小说 (zy613a68)", "value": "zy613a68"},
-  {"label": "鸿蒙-得间极速版 (zy8f2e24)", "value": "zy8f2e24"},
-  {"label": "鸿蒙-阅瓣小说 (zy7595fe)", "value": "zy7595fe"},
-  {"label": "鸿蒙-追读小说 (zyd0d2ca)", "value": "zyd0d2ca"},
-  {"label": "新速看短剧（北京伊看） (zy8b0c8f)", "value": "zy8b0c8f"}
+  {"text": "得间小说安卓 (zy4248ba)", "value": "zy4248ba"},
+  {"text": "得间小说 iOS (zy4248ba)", "value": "zy4248ba"},
+  {"text": "得间小说安卓极速版 (zy8f2e24)", "value": "zy8f2e24"},
+  {"text": "得间小说 iOS 极速版 (zy8f2e24)", "value": "zy8f2e24"},
+  {"text": "追读 iOS (zybc0e74)", "value": "zybc0e74"},
+  {"text": "七读小说 (zy819b7a)", "value": "zy819b7a"},
+  {"text": "得间畅听 (zy9b17a7)", "value": "zy9b17a7"},
+  {"text": "琅阅小说 (zy21c192)", "value": "zy21c192"},
+  {"text": "得间大字版 (zy78e04c)", "value": "zy78e04c"},
+  {"text": "阅瓣小说 (zy7595fe)", "value": "zy7595fe"},
+  {"text": "贤读小说 (zyf36a0f)", "value": "zyf36a0f"},
+  {"text": "追读小说 (zyd0d2ca)", "value": "zyd0d2ca"},
+  {"text": "袋鼠点点小说 (zybd351b)", "value": "zybd351b"},
+  {"text": "盛读小说 (zy0903f1)", "value": "zy0903f1"},
+  {"text": "速读小说 (zyb03dd4)", "value": "zyb03dd4"},
+  {"text": "浩看小说 (zy613a68)", "value": "zy613a68"},
+  {"text": "秘读小说 (zy4cb605)", "value": "zy4cb605"},
+  {"text": "浩阅小说 (zy8eef2a)", "value": "zy8eef2a"},
+  {"text": "袋鼠点点短视频 (zyf4648c)", "value": "zyf4648c"},
+  {"text": "枫以短视频 (zy3d1ef1)", "value": "zy3d1ef1"},
+  {"text": "薏米短剧 (zy9351ae)", "value": "zy9351ae"},
+  {"text": "速看短剧 (zya8dad8)", "value": "zya8dad8"},
+  {"text": "伊看短剧 (zy6ee66f)", "value": "zy6ee66f"},
+  {"text": "卡看 (zya3c0e0)", "value": "zya3c0e0"},
+  {"text": "北京主体伊看 (zy8b0c8f)", "value": "zy8b0c8f"},
+  {"text": "得间努比亚小说 (zye4a38c)", "value": "zye4a38c"},
+  {"text": "得间鸿蒙 (zy4248ba)", "value": "zy4248ba"},
+  {"text": "鸿蒙-七读小说 (zy819b7a)", "value": "zy819b7a"},
+  {"text": "鸿蒙-浩看小说 (zy613a68)", "value": "zy613a68"},
+  {"text": "鸿蒙-得间极速版 (zy8f2e24)", "value": "zy8f2e24"},
+  {"text": "鸿蒙-阅瓣小说 (zy7595fe)", "value": "zy7595fe"},
+  {"text": "鸿蒙-追读小说 (zyd0d2ca)", "value": "zyd0d2ca"},
+  {"text": "新速看短剧（北京伊看） (zy8b0c8f)", "value": "zy8b0c8f"}
 ])
 
-// 计算属性 - 过滤选项
-const filteredOptions = computed<AppIdOption[]>(() => {
-  if (!formData.value.appId) return appIdOptions.value
-  
-  const searchText = formData.value.appId.toLowerCase()
-  return appIdOptions.value.filter(option => 
-    option.label.toLowerCase().includes(searchText) ||
-    option.value.toLowerCase().includes(searchText)
-  )
+// 计算属性 - Arco Select选项数据
+const selectOptions = computed(() => {
+  return appIdOptions.value.map(option => ({
+    label: option.text,
+    value: option.value
+  }))
 })
 
 // 方法
-const toggleDropdown = (): void => {
-  isDropdownOpen.value = !isDropdownOpen.value
-}
-
-const closeDropdown = (): void => {
-  isDropdownOpen.value = false
-}
-
-const selectOption = (option: AppIdOption): void => {
-  formData.value.appId = option.value
-  closeDropdown()
-}
-
-const handleInput = (): void => {
-  if (!isDropdownOpen.value && formData.value.appId) {
-    isDropdownOpen.value = true
-  }
-}
-
-const handleKeydown = (e: KeyboardEvent): void => {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    closeDropdown()
-  } else if (e.key === 'Escape') {
-    closeDropdown()
-  }
-}
-
 const showResult = (message: string, type: 'success' | 'error' = 'success', encryptedData?: string): void => {
   result.value = {
     show: true,
@@ -286,15 +235,7 @@ const copyToClipboard = async (): Promise<void> => {
   }
 }
 
-// 点击外部关闭下拉框的事件处理
-const handleClickOutside = (e: Event): void => {
-  if (selectContainer.value && !selectContainer.value.contains(e.target as Node)) {
-    closeDropdown()
-  }
-}
 
-// 添加事件监听器
-document.addEventListener('click', handleClickOutside)
 </script>
 
 <style scoped>
@@ -380,6 +321,7 @@ document.addEventListener('click', handleClickOutside)
 
 .form-input {
   width: 100%;
+  height: 48px;
   padding: 12px 16px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
@@ -388,95 +330,97 @@ document.addEventListener('click', handleClickOutside)
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   color: rgba(255, 255, 255, 0.9);
+}
+
+.form-input:hover {
+  border-color: rgba(179, 127, 235, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 1px rgba(179, 127, 235, 0.2);
 }
 
 .form-input:focus {
   outline: none;
   border-color: rgba(179, 127, 235, 0.6);
   background: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 0 3px rgba(179, 127, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(179, 127, 235, 0.15);
 }
 
-.select-container {
-  position: relative;
+.form-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
 }
 
-.select-input {
+/* Arco Select自定义样式 - 紫色主题 */
+.custom-select {
   width: 100%;
-  padding: 12px 40px 12px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  font-size: 16px;
-  background: rgba(255, 255, 255, 0.1);
+}
+
+
+.custom-select :deep(.arco-select-view) {
+  background: rgba(255, 255, 255, 0.1) !important;
   backdrop-filter: blur(10px);
-  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 12px !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 16px;
   transition: all 0.3s ease;
-  color: rgba(255, 255, 255, 0.9);
+  height: 48px;
+  box-shadow: none !important;
+  display: flex;
+  align-items: center;
 }
 
-.select-input:focus {
-  outline: none;
-  border-color: rgba(179, 127, 235, 0.6);
-  background: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 0 3px rgba(179, 127, 235, 0.1);
+.custom-select :deep(.arco-select-view:hover) {
+  border-color: rgba(179, 127, 235, 0.5) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 0 0 1px rgba(179, 127, 235, 0.2) !important;
 }
 
-.select-arrow {
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: rgba(255, 255, 255, 0.7);
-  transition: transform 0.3s ease;
+.custom-select :deep(.arco-select-view-focus) {
+  border-color: rgba(179, 127, 235, 0.6) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 0 3px rgba(179, 127, 235, 0.15) !important;
 }
 
-.select-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 2px solid #e1e5e9;
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 1000;
-  display: none;
+.custom-select :deep(.arco-select-view-value) {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 20px;
 }
 
-.select-dropdown.show {
-  display: block;
+.custom-select :deep(.arco-select-view-placeholder) {
+  color: rgba(255, 255, 255, 0.6) !important;
 }
 
-.select-option {
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-bottom: 1px solid #f0f0f0;
+.custom-select :deep(.arco-select-view-suffix) {
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
-.select-option:hover {
-  background-color: #f8f9fa;
+.custom-select :deep(.arco-select-view-arrow) {
+  color: rgba(255, 255, 255, 0.7) !important;
+  transition: all 0.3s ease;
 }
 
-.select-option:last-child {
-  border-bottom: none;
+.custom-select :deep(.arco-select-view-arrow.arco-select-view-arrow-expand) {
+  transform: rotate(180deg);
+  color: rgba(179, 127, 235, 0.8) !important;
 }
 
-.select-option.selected {
-  background-color: #b37feb;
-  color: white;
+.custom-select :deep(.arco-select-view-input) {
+  color: rgba(255, 255, 255, 0.9) !important;
+  background: transparent !important;
+  font-size: 16px;
+}
+
+.custom-select :deep(.arco-select-view-input::placeholder) {
+  color: rgba(255, 255, 255, 0.6) !important;
 }
 
 .submit-btn {
   width: 100%;
-  padding: 14px;
+  padding: 16px;
   background: linear-gradient(135deg, #b37feb 0%, #d3adf7 100%);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -613,9 +557,7 @@ document.addEventListener('click', handleClickOutside)
   border-left-color: #27ae60;
 }
 
-.arrow-rotate {
-  transform: translateY(-50%) rotate(180deg) !important;
-}
+
 
 /* 动态背景样式 */
 .bg-animation {
@@ -791,5 +733,107 @@ document.addEventListener('click', handleClickOutside)
   .floating-shape {
     opacity: 0.6;
   }
+  
+  /* 移动端Select优化 */
+  .custom-select :deep(.arco-select-view) {
+    font-size: 14px;
+    padding: 10px 12px;
+    min-height: 44px;
+  }
+  
+  .custom-select :deep(.arco-select-view-value) {
+    font-size: 14px;
+  }
+  
+  .custom-select :deep(.arco-select-option) {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
 }
 </style> 
+
+<style>
+/* 下拉框面板样式 - 紫色主题 */
+.arco-select-dropdown {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border-radius: 12px !important;
+  border: 1px solid rgba(179, 127, 235, 0.2) !important;
+  box-shadow: 
+    0 8px 32px rgba(179, 127, 235, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.arco-select-dropdown-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.arco-select-option {
+  padding: 12px 16px;
+  color: #4a4a4a !important;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  border-radius: 8px !important;
+  margin: 2px 0;
+  background: transparent !important;
+}
+
+.arco-select-option:hover {
+  background: rgba(179, 127, 235, 0.1) !important;
+  color: #b37feb !important;
+  transform: translateX(2px);
+}
+
+.arco-select-option-selected {
+  background: linear-gradient(135deg, rgba(179, 127, 235, 0.15), rgba(211, 173, 247, 0.15)) !important;
+  color: #b37feb !important;
+  font-weight: 500;
+  border: 1px solid rgba(179, 127, 235, 0.2) !important;
+}
+
+.arco-select-option-active {
+  background: rgba(179, 127, 235, 0.08) !important;
+}
+
+.arco-select-option-disabled {
+  color: #999 !important;
+  background: transparent !important;
+  opacity: 0.5;
+}
+
+/* 搜索无结果时的样式 */
+.arco-select-dropdown-empty {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  background: rgba(179, 127, 235, 0.05);
+  border-radius: 8px;
+  margin: 8px;
+}
+
+/* 滚动条样式 - 紫色主题 */
+.arco-select-dropdown-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.arco-select-dropdown-list::-webkit-scrollbar-track {
+  background: rgba(179, 127, 235, 0.1);
+  border-radius: 3px;
+}
+
+.arco-select-dropdown-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #b37feb, #d3adf7);
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.arco-select-dropdown-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #9254de, #b37feb);
+  transform: scaleY(1.1);
+}
+</style>
